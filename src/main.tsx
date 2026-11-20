@@ -6,3 +6,4 @@ import '@fontsource-variable/fraunces/wght-italic.css'
 import './styles.css'
 
 createRoot(document.getElementById('root')!).render(<App />)
+import './journeys.css'

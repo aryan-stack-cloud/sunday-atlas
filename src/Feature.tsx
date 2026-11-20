@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUpRight, Clock3, MapPin } from 'lucide-react'
 import { money, trips, type Trip } from './trips'
 
-const covers = [import.meta.env.BASE_URL + 'images/atlas-hero.webp', trips[1].image, trips[2].image]
+const covers = [import.meta.env.BASE_URL + 'images/delhi-illustrated.webp', trips[1].image, trips[2].image]
 
 export function Feature({ onExplore, onOpen }: { onExplore: () => void; onOpen: (trip: Trip) => void }) {
   const [current, setCurrent] = useState(0)
@@ -13,7 +13,7 @@ export function Feature({ onExplore, onOpen }: { onExplore: () => void; onOpen: 
   }
 
   return (
-    <section className="feature" aria-labelledby="hero-title">
+    <section className={'feature feature--' + current} aria-labelledby="hero-title">
       {covers.map((cover, index) => (
         <img className={'feature-photo frame-' + index + (index === current ? ' is-current' : '')}
           key={cover} src={cover} alt="" fetchPriority={index === 0 ? 'high' : 'low'} />
@@ -21,9 +21,9 @@ export function Feature({ onExplore, onOpen }: { onExplore: () => void; onOpen: 
       <div className="shell feature-layout">
         <div className="feature-copy">
           <p className="section-kicker"><MapPin size={15} /> Day trips from Delhi NCR</p>
-          <h1 id="hero-title">The city<br />can <em>wait.</em></h1>
-          <p>Walk old gardens, get your hands in clay, or watch the wetlands wake up. A different weekend is closer than you think.</p>
-          <a href="#explore" className="feature-cta" onClick={onExplore}>Explore trips <ArrowDown size={17} /></a>
+          <h1 id="hero-title">Delhi,<br /><em>rediscovered.</em></h1>
+          <p>Find small-group walks, workshops and nature escapes around Delhi NCR.</p>
+          <a href="#/experiences" className="feature-cta" onClick={onExplore}>Explore trips <ArrowDown size={17} /></a>
         </div>
         <div className="feature-pager" role="group" aria-label="Featured experiences">
           <div className="feature-arrows">
@@ -39,10 +39,12 @@ export function Feature({ onExplore, onOpen }: { onExplore: () => void; onOpen: 
             </span>
             <ArrowUpRight size={19} />
           </button>
-          <div className="feature-pips" aria-label="Choose a featured trip">
+          <div className="feature-postcards" aria-label="Choose a featured trip">
             {trips.map((item, index) => (
               <button key={item.id} type="button" aria-label={'Feature ' + item.name}
-                aria-pressed={index === current} onClick={() => setCurrent(index)} />
+                aria-pressed={index === current} onClick={() => setCurrent(index)}>
+                <img src={item.image} alt="" /><span>{item.category}</span>
+              </button>
             ))}
           </div>
         </div>

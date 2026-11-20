@@ -1,41 +1,42 @@
 # Sunday Atlas
 
-**[Try the booking demo](https://aryan-stack-cloud.github.io/sunday-atlas/)**
+[Open the public catalog](https://aryan-stack-cloud.github.io/sunday-atlas/)
 
-A responsive booking prototype for small-group experiences around Delhi NCR. Explore a heritage walk, a pottery workshop, or a birding trip, then choose a date and book in demo mode.
+Sunday Atlas is a Delhi NCR experience site with a destination catalog, shareable trip pages, saved trips, comparison, and a database-backed reservation workflow. Each published departure has an operator-controlled date and available capacity.
 
-![Sunday Atlas desktop trip discovery](docs/desktop.webp)
+## Design case study
 
-## UX case study
+The illustrated homepage takes its warm, layered atmosphere from the [Kamui reference](https://in.pinterest.com/pin/800303796276346241/). The [destination reference](https://in.pinterest.com/pin/1032520652057780971/) informed the image-led trip pages, oversized place names, and postcard navigation. The artwork, brand, and layouts are original.
 
-The second design pass uses immersive carousel photography and an asymmetric gallery, taking inspiration from [Pinterest's travel curation and visual planning examples](https://business.pinterest.com/en-gb/blog/where-passion-meets-planning-pinterest-travel-bookings/?change_language=true&filters=best-practices). The artwork and application layout are original.
+![Sunday Atlas illustrated homepage and catalog](docs/desktop.webp)
 
-**Design question.** Can someone compare nearby weekend plans and see exactly what they’re booking in a few steps?
+- **Discovery.** Browse by category, search for a place, filter departures by date, or compare trips by cost, duration, and seats.
+- **Trip planning.** A dedicated page includes itinerary, start time, meeting point, and dates.
+- **Reservations.** Visitors submit a request and track its status from the same browser. The operator confirms or declines requests and publishes or closes departures. Pending and confirmed parties count toward capacity.
 
-| Decision | How it appears in the product |
-|---|---|
-| Compare before opening a trip | The featured carousel leads into an asymmetric gallery. Search, category, and date filters narrow the list. A comparison table shows price, duration, start time, and group size or seats remaining. |
-| Make availability and cost visible early | Date choices show times and sold-out states in Delhi local time. The selected date carries into the booking flow. The price updates as guests change and appears again in the booking review. |
-| Let people revisit a decision | Saved trips and demo bookings survive a reload. Bookings can be cancelled from My trips. |
-| Support keyboard and mobile use | Dialogs trap focus, restore it on close, and respond to Escape. The layout supports 320px screens and reduced motion. |
+![Sunday Atlas trip page on mobile](docs/mobile.webp)
 
-The flows are design hypotheses implemented and tested in a browser. No user interviews or conversion results are claimed. Iteration could test whether users can find a trip for a set budget and explain the total before confirming.
+## Run the full site
 
-![Mobile booking review showing the date, guest count and total](docs/mobile.webp)
-
-## Run locally
+Requires Node 22.13 or later.
 
 ```sh
 npm ci
-npm run dev
+npm run build
+npm start
 ```
 
-To verify the production build and run the booking tests:
+Open `http://127.0.0.1:4173` by default. Set `PORT` to choose another port. The app starts with an empty departure calendar. Set `ATLAS_ADMIN_KEY` to a randomly generated key of at least 32 characters in the ignored local `.env`. Use the Operator desk at `/#/operator` to publish dates you can actually host.
+
+Bookings and departures are stored at `data/sunday-atlas.sqlite` by default. Set `ATLAS_DB` to use a persistent disk when hosting. Set `ATLAS_SAMPLE=1` with a separate database to exercise sample departures without collecting visitor details.
+
+For a public booking deployment, run the Node server behind HTTPS, set `ATLAS_SECURE_COOKIE=1`, and publish approved provider dates. Store the operator key in the host's secret configuration and include an appropriate privacy notice for the operator's use of booking contact details. Customer access is tied to a browser session. Operators confirm and contact customers directly and arrange payment outside the application. On GitHub Pages the catalog, saved experiences, and browsing are available as static pages.
+
+## Verify
 
 ```sh
 npm run build
+npm run test:server
 npx playwright install chromium
 npm test
 ```
-
-Built with React, TypeScript, and Vite. Trips and availability are sample data. Illustrative imagery was generated for the prototype. Bookings stay in browser storage and require no payment or contact details.

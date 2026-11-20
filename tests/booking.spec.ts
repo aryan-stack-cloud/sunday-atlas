@@ -1,8 +1,9 @@
 import { expect, test } from '@playwright/test'
+import { operatorKey } from '../playwright.config'
 
-test('filters and saves trips across reloads', async ({ page }) => {
+test('filters and saves experiences across reloads', async ({ page }) => {
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: 'The city can wait.' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Delhi, rediscovered.' })).toBeVisible()
   await expect(page.getByRole('article')).toHaveCount(3)
   await page.getByRole('button', { name: 'Workshops' }).click()
   await expect(page.getByRole('article')).toHaveCount(1)
@@ -12,15 +13,15 @@ test('filters and saves trips across reloads', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Hands in clay' })).toBeVisible()
   await page.getByRole('button', { name: 'Remove Hands in clay from saved trips' }).click()
   await expect(page.getByText('No saved trips yet')).toBeVisible()
-  await page.getByRole('button', { name: 'Show all trips' }).click()
+  await page.getByRole('link', { name: 'Explore', exact: true }).first().click()
   await page.getByRole('searchbox').fill('Noida')
   await expect(page.getByRole('article')).toHaveCount(1)
-  await expect(page.getByRole('heading', { name: 'A morning in the reeds' })).toBeVisible()
 })
 
-test('reviews prices, persists a booking and cancels it', async ({ page }) => {
-  await page.goto('/')
-  await page.getByRole('article').filter({ hasText: 'Lodhi before the crowds' }).getByRole('button', { name: 'View trip' }).click()
+test('opens a destination, saves a request, and cancels it after reload', async ({ page }) => {
+  await page.goto('/#/experiences/lodhi')
+  await expect(page.getByRole('heading', { name: 'Lodhi', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Choose a date' }).click()
   const modal = page.getByRole('dialog')
   await expect(modal.getByRole('button', { name: 'Review booking' })).toBeDisabled()
   await modal.getByRole('radio').first().check()
@@ -28,24 +29,26 @@ test('reviews prices, persists a booking and cancels it', async ({ page }) => {
   await expect(modal.getByText('₹1,500')).toBeVisible()
   await modal.getByRole('button', { name: 'Review booking' }).click()
   await expect(modal.getByRole('heading', { name: 'Review your booking' })).toBeFocused()
-  await expect(modal.getByText('₹750 × 2')).toBeVisible()
-  await modal.getByRole('button', { name: 'Confirm demo booking' }).click()
-  await expect(modal.getByText(/Demo booking SA-/)).toBeVisible()
+  await modal.getByRole('button', { name: 'Request reservation' }).click()
+  await expect(modal.getByText(/Booking reference SA-/)).toBeVisible()
+  await modal.getByRole('button', { name: 'See my trips' }).click()
   await page.reload()
-  await page.getByRole('button', { name: /My trips/ }).click()
-  await expect(page.getByRole('dialog').getByText('2 guests · ₹1,500')).toBeVisible()
+  await expect(page.getByText('2 guests · ₹1,500')).toBeVisible()
   await page.getByRole('button', { name: 'Cancel booking' }).click()
   await page.getByRole('button', { name: 'Yes, cancel' }).click()
-  await expect(page.getByRole('dialog').getByText('No bookings yet')).toBeVisible()
+  await expect(page.getByText('cancelled', { exact: true })).toBeVisible()
 })
 
-test('mobile layout, image loads and Escape focus return', async ({ page }) => {
+test('supports narrow screens, featured postcards and keyboard focus return', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 760 })
   await page.goto('/')
-  await expect(page.getByRole('article')).toHaveCount(3)
+  await page.getByRole('button', { name: 'Next featured trip' }).click()
+  await expect(page.getByRole('button', { name: 'Feature Hands in clay' })).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('button', { name: 'Open featured trip: Hands in clay' }).click()
+  await expect(page.getByRole('heading', { name: 'Shahpur Jat', exact: true })).toBeVisible()
   await expect.poll(() => page.locator('img').evaluateAll(images => images.every(image => (image as HTMLImageElement).naturalWidth > 0))).toBe(true)
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(320)
-  const button = page.getByRole('button', { name: 'View trip' }).first()
+  const button = page.getByRole('button', { name: 'Choose a date' })
   await button.click()
   await expect(page.getByRole('dialog')).toBeVisible()
   await page.keyboard.press('Escape')
@@ -53,31 +56,48 @@ test('mobile layout, image loads and Escape focus return', async ({ page }) => {
   await expect(button).toBeFocused()
 })
 
-test('featured carousel opens the selected experience', async ({ page }) => {
-  await page.goto('/')
-  await page.getByRole('button', { name: 'Next featured trip' }).click()
-  await expect(page.getByRole('button', { name: 'Feature Hands in clay' })).toHaveAttribute('aria-pressed', 'true')
-  await page.getByRole('button', { name: 'Feature A morning in the reeds' }).click()
-  await page.getByRole('button', { name: 'Open featured trip: A morning in the reeds' }).click()
-  const modal = page.getByRole('dialog')
-  await expect(modal.getByRole('heading', { name: 'A morning in the reeds' })).toBeVisible()
-  await modal.getByText('Itinerary and meeting point').click()
-  await expect(modal.getByText('Follow the reed-lined trail')).toBeVisible()
-})
-
-test('compares trips on the selected date and carries that date to booking', async ({ page }) => {
+test('comparison carries the selected date to the reservation', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.goto('/')
+  await page.goto('/#/experiences')
   const date = page.getByRole('combobox', { name: 'Filter by date' })
   await date.selectOption({ index: 1 })
   await page.getByRole('button', { name: 'Compare Lodhi before the crowds' }).click()
-  await expect(page.getByRole('button', { name: 'Compare trips', exact: true })).toBeDisabled()
   await page.getByRole('button', { name: 'Compare Hands in clay' }).click()
   await page.getByRole('button', { name: 'Compare trips', exact: true }).click()
   const modal = page.getByRole('dialog')
-  await expect(modal.getByRole('columnheader', { name: 'Hands in clay' })).toBeVisible()
   await expect(modal.getByRole('rowheader', { name: 'Spots left' })).toBeVisible()
   await modal.getByRole('button', { name: 'View Hands in clay' }).click()
+  await page.getByRole('button', { name: 'Choose a date' }).click()
   await expect(page.getByRole('dialog').getByRole('radio').first()).toBeChecked()
-  await expect(page.getByRole('dialog').getByRole('button', { name: 'Review booking' })).toBeEnabled()
+})
+
+test('shares capacity across sessions and protects operator actions', async ({ browser, request }) => {
+  const visitor = await browser.newContext({ baseURL: test.info().project.use.baseURL })
+  const other = await browser.newContext({ baseURL: test.info().project.use.baseURL })
+  try {
+    expect((await request.get('/api/operator')).status()).toBe(401)
+    const { departures } = await (await visitor.request.get('/api/state')).json()
+    await other.request.get('/api/state')
+    const slot = departures.find((item: { trip: string }) => item.trip === 'wetlands')
+    const input = { trip: slot.trip, date: slot.date, guests: slot.capacity, requestKey: crypto.randomUUID() }
+    const booking = await (await visitor.request.post('/api/bookings', { data: input })).json()
+    expect(booking.status).toBe('pending')
+    const repeated = await (await visitor.request.post('/api/bookings', { data: input })).json()
+    expect(repeated.id).toBe(booking.id)
+    expect((await other.request.post('/api/bookings', { data: input })).status()).toBe(409)
+    expect((await other.request.delete('/api/bookings/' + booking.id)).status()).toBe(404)
+    const operator = await browser.newPage({ baseURL: test.info().project.use.baseURL })
+    try {
+      await operator.goto('/#/operator')
+      await operator.getByLabel('Operator access key').fill(operatorKey)
+      await operator.getByRole('button', { name: 'Load dashboard' }).click()
+      const row = operator.getByRole('listitem').filter({ hasText: booking.id })
+      await row.getByRole('button', { name: 'Confirm' }).click()
+      await expect(row.getByText(/confirmed/)).toBeVisible()
+    } finally { await operator.close() }
+    const state = await (await visitor.request.get('/api/state')).json()
+    expect(state.bookings.find((item: { id: string }) => item.id === booking.id).status).toBe('confirmed')
+    expect((await visitor.request.delete('/api/bookings/' + booking.id)).status()).toBe(200)
+    expect((await other.request.post('/api/bookings', { data: input })).status()).toBe(201)
+  } finally { await visitor.close(); await other.close() }
 })

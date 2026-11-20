@@ -1,10 +1,13 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import {
   ArrowLeft, ArrowRight, ArrowUpRight, CalendarDays, Check, ChevronRight, Clock3, Compass,
   Columns2, Heart, MapPin, Minus, Plus, Search, Ticket, Users, X,
 } from 'lucide-react'
-import { dateLabel, money, seatsLeft, trips, weekendDates, type Booking, type Trip } from './trips'
+import { dateLabel, money, seatsLeft, trips, type Booking, type Departure, type Trip } from './trips'
 import { Feature } from './Feature'
+import { Destination } from './Destination'
+import { Operator } from './Operator'
+import { api, type AtlasState, type BookingInput } from './api'
 
 const categories = ['All trips', 'Heritage', 'Workshops', 'Outdoors'] as const
 type Filter = (typeof categories)[number]
@@ -26,8 +29,8 @@ function storeLocal<T,>(key: string, value: T) {
   }
 }
 
-function Modal({ children, onClose, title, side = false }: {
-  children: ReactNode; onClose: () => void; title: string; side?: boolean
+function Modal({ children, onClose, title }: {
+  children: ReactNode; onClose: () => void; title: string
 }) {
   const ref = useRef<HTMLDialogElement>(null)
 
@@ -45,7 +48,7 @@ function Modal({ children, onClose, title, side = false }: {
   }, [])
 
   return (
-    <dialog ref={ref} aria-label={title} className={'dialog' + (side ? ' dialog--side' : '')}
+    <dialog ref={ref} aria-label={title} className="dialog"
       onCancel={event => { event.preventDefault(); onClose() }}
       onClick={event => { if (event.target === event.currentTarget) onClose() }}>
       <div className="dialog-inner">
@@ -87,8 +90,8 @@ function TripCard({ trip, saved, compared, onSave, onCompare, onOpen }: {
   )
 }
 
-function CompareDialog({ items, date, bookings, onClose, onOpen }: {
-  items: Trip[]; date: string; bookings: Booking[]; onClose: () => void; onOpen: (trip: Trip) => void
+function CompareDialog({ items, date, departures, onClose, onOpen }: {
+  items: Trip[]; date: string; departures: Departure[]; onClose: () => void; onOpen: (trip: Trip) => void
 }) {
   return (
     <Modal title="Compare trips" onClose={onClose}>
@@ -104,7 +107,7 @@ function CompareDialog({ items, date, bookings, onClose, onOpen }: {
               <tr><th scope="row">Per person</th>{items.map(trip => <td key={trip.id}>{money(trip.price)}</td>)}</tr>
               <tr><th scope="row">Duration</th>{items.map(trip => <td key={trip.id}>{trip.duration}</td>)}</tr>
               <tr><th scope="row">Starts at</th>{items.map(trip => <td key={trip.id}>{trip.time}</td>)}</tr>
-              <tr><th scope="row">{date ? 'Spots left' : 'Group size'}</th>{items.map(trip => <td key={trip.id}>{date ? seatsLeft(trip, date, bookings) : 'Up to ' + trip.capacity}</td>)}</tr>
+              <tr><th scope="row">{date ? 'Spots left' : 'Group size'}</th>{items.map(trip => <td key={trip.id}>{date ? seatsLeft(trip, date, departures) : 'Up to ' + trip.capacity}</td>)}</tr>
               <tr><th scope="row">Location</th>{items.map(trip => <td key={trip.id}>{trip.location}</td>)}</tr>
               <tr><td />{items.map(trip => <td key={trip.id}><button className="text-button" type="button"
                 aria-label={'View ' + trip.name} onClick={() => onOpen(trip)}>View trip <ArrowUpRight size={15} /></button></td>)}</tr>
@@ -116,31 +119,46 @@ function CompareDialog({ items, date, bookings, onClose, onOpen }: {
   )
 }
 
-function BookingDialog({ trip, bookings, initialDate, onBook, onClose, onTrips }: {
-  trip: Trip; bookings: Booking[]; initialDate: string; onBook: (booking: Booking) => void; onClose: () => void; onTrips: () => void
+function BookingDialog({ trip, departures, initialDate, sample, onBook, onClose, onTrips }: {
+  trip: Trip; departures: Departure[]; initialDate: string; sample: boolean
+  onBook: (input: BookingInput) => Promise<Booking>; onClose: () => void; onTrips: () => void
 }) {
   const [stage, setStage] = useState<'choose' | 'review' | 'done'>('choose')
-  const [date, setDate] = useState(() => initialDate && seatsLeft(trip, initialDate, bookings) ? initialDate : '')
+  const [date, setDate] = useState(() => initialDate && seatsLeft(trip, initialDate, departures) ? initialDate : '')
   const [guests, setGuests] = useState(1)
   const [reference, setReference] = useState('')
-  const dates = weekendDates()
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [requestKey, setRequestKey] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState('')
+  const dates = departures.filter(item => item.trip === trip.id && item.active).map(item => item.date)
   const headline = useRef<HTMLHeadingElement>(null)
-  const available = (day: string) => seatsLeft(trip, day, bookings)
+  const available = (day: string) => seatsLeft(trip, day, departures)
   const seats = date ? available(date) : trip.capacity
   const canBook = dates.includes(date) && guests <= seats
   const total = money(trip.price * guests)
 
   function go(next: typeof stage) {
     setStage(next)
+    setMessage('')
     requestAnimationFrame(() => headline.current?.focus())
   }
 
-  function confirm() {
-    if (!canBook) return
-    const id = 'SA-' + crypto.randomUUID().slice(0, 8).toUpperCase()
-    onBook({ id, trip: trip.id, date, guests })
-    setReference(id)
-    go('done')
+  async function confirm(event: FormEvent) {
+    event.preventDefault()
+    if (!canBook || busy) return
+    setBusy(true)
+    setMessage('')
+    try {
+      const booking = await onBook({ trip: trip.id, date, guests, requestKey, name, email })
+      setReference(booking.id)
+      go('done')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Could not save the request. Try again.')
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -184,12 +202,12 @@ function BookingDialog({ trip, bookings, initialDate, onBook, onClose, onTrips }
             </div>
             <div className="booking-footer">
               <div className="price"><strong>{total}</strong><small>Total for {guests} {guests === 1 ? 'guest' : 'guests'}</small></div>
-              <button type="button" className="primary" disabled={!canBook} onClick={() => go('review')}>Review booking <ArrowRight size={17} /></button>
+              <button type="button" className="primary" disabled={!canBook} onClick={() => { setRequestKey(crypto.randomUUID()); go('review') }}>Review booking <ArrowRight size={17} /></button>
             </div>
           </div>
         </>
       ) : stage === 'review' ? (
-        <div className="dialog-content review">
+        <form className="dialog-content review" onSubmit={confirm}>
           <button className="text-button" type="button" onClick={() => go('choose')}><ArrowLeft size={16} /> Back to trip</button>
           <h2 ref={headline} tabIndex={-1}>Review your booking</h2>
           <div className="review-card">
@@ -199,15 +217,20 @@ function BookingDialog({ trip, bookings, initialDate, onBook, onClose, onTrips }
             <p><Users size={17} /> {guests} {guests === 1 ? 'guest' : 'guests'}</p>
             <div className="review-total"><span>{money(trip.price)} × {guests}</span><strong>{total}</strong></div>
           </div>
-          <p className="fine-print">This is a demo booking. No payment or personal details are collected.</p>
-          <button type="button" className="primary" disabled={!canBook} onClick={confirm}>Confirm demo booking <ArrowRight size={17} /></button>
-        </div>
+          {!sample && <div className="contact-fields">
+            <label>Full name <input value={name} onChange={event => setName(event.target.value)} name="name" autoComplete="name" required minLength={2} maxLength={80} /></label>
+            <label>Email address <input value={email} onChange={event => setEmail(event.target.value)} type="email" name="email" autoComplete="email" required maxLength={200} /></label>
+          </div>}
+          <p className="fine-print">{sample ? 'This site is using sample departures for testing.' : 'The operator uses your email to contact you about this request. Payment is arranged separately.'}</p>
+          {message && <p className="form-error" role="alert">{message}</p>}
+          <button type="submit" className="primary" disabled={!canBook || busy}>{busy ? 'Sending request…' : 'Request reservation'} <ArrowRight size={17} /></button>
+        </form>
       ) : (
         <div className="dialog-content success">
           <span className="success-icon"><Check size={28} /></span>
-          <h2 ref={headline} tabIndex={-1}>You’re on the list.</h2>
+          <h2 ref={headline} tabIndex={-1}>Request received.</h2>
           <p>{trip.name} · {dateLabel(date)} · {guests} {guests === 1 ? 'guest' : 'guests'}</p>
-          <p className="reference">Demo booking {reference}</p>
+          <p className="reference">Booking reference {reference}</p><p>Check My trips for confirmation from the operator.</p>
           <button type="button" className="primary" onClick={onTrips}>See my trips <ArrowRight size={17} /></button>
         </div>
       )}
@@ -215,54 +238,77 @@ function BookingDialog({ trip, bookings, initialDate, onBook, onClose, onTrips }
   )
 }
 
-function MyTrips({ bookings, onClose, onCancel }: { bookings: Booking[]; onClose: () => void; onCancel: (id: string) => void }) {
+function MyTrips({ bookings, onCancel, refresh }: {
+  bookings: Booking[]; onCancel: (id: string) => Promise<void>; refresh: () => void
+}) {
   const [cancel, setCancel] = useState('')
+  const [pending, setPending] = useState(false)
+  const [message, setMessage] = useState('')
+  async function confirmCancellation(id: string) {
+    setPending(true)
+    setMessage('')
+    try { await onCancel(id); setCancel('') }
+    catch (error) { setMessage(error instanceof Error ? error.message : 'Cancellation failed.') }
+    finally { setPending(false) }
+  }
   return (
-    <Modal title="My trips" side onClose={onClose}>
-      <div className="dialog-content tray">
-        <h2>My trips</h2>
-        {bookings.length ? bookings.map(booking => {
-          const trip = trips.find(item => item.id === booking.trip)
-          if (!trip) return null
-          return (
-            <article key={booking.id} className="tray-item">
-              <img src={trip.image} alt="" />
-              <div>
-                <h3>{trip.name}</h3>
-                <p>{dateLabel(booking.date)} · {trip.time}</p>
-                <p>{booking.guests} {booking.guests === 1 ? 'guest' : 'guests'} · {money(trip.price * booking.guests)}</p>
-                {cancel === booking.id ? (
-                  <div className="cancel-actions">
-                    <button type="button" className="text-button" onClick={() => { onCancel(booking.id); setCancel('') }}>Yes, cancel</button>
-                    <button type="button" className="text-button" onClick={() => setCancel('')}>Keep booking</button>
-                  </div>
-                ) : <button type="button" className="text-button cancel" onClick={() => setCancel(booking.id)}>Cancel booking</button>}
-              </div>
-            </article>
-          )
-        }) : <div className="empty"><Ticket size={30} /><h3>No bookings yet</h3><button type="button" className="primary" onClick={onClose}>Explore trips <ArrowRight size={17} /></button></div>}
-      </div>
-    </Modal>
+    <main id="main-content" className="shell utility-page">
+      <div className="utility-heading"><h1>My trips</h1><button className="secondary" type="button" onClick={refresh}>Refresh status</button></div>
+      {message && <p role="alert">{message}</p>}
+      {bookings.length ? bookings.map(booking => {
+        const trip = trips.find(item => item.id === booking.trip)
+        if (!trip) return null
+        return (
+          <article key={booking.id} className="tray-item">
+            <img src={trip.image} alt="" />
+            <div>
+              <h3>{trip.name}</h3>
+              <p>{dateLabel(booking.date)} · {trip.time}</p>
+              <p>{booking.guests} {booking.guests === 1 ? 'guest' : 'guests'} · {money(booking.total)}</p>
+              <p>{booking.id}</p>
+              {(booking.status === 'pending' || booking.status === 'confirmed') && (cancel === booking.id ? (
+                <div className="cancel-actions">
+                  <button type="button" disabled={pending} className="text-button" onClick={() => void confirmCancellation(booking.id)}>Yes, cancel</button>
+                  <button type="button" disabled={pending} className="text-button" onClick={() => setCancel('')}>Keep booking</button>
+                </div>
+              ) : <button type="button" className="text-button cancel" onClick={() => setCancel(booking.id)}>Cancel booking</button>)}
+            </div>
+            <span className={'booking-status status-' + booking.status}>{booking.status}</span>
+          </article>
+        )
+      }) : <div className="empty"><Ticket size={30} /><h3>No bookings yet</h3><a className="primary" href="#/experiences">Explore trips <ArrowRight size={17} /></a></div>}
+    </main>
   )
+}
+
+function readRoute() {
+  return window.location.hash.startsWith('#/') ? window.location.hash.slice(1) : '/'
 }
 
 export function App() {
   const [filter, setFilter] = useState<Filter>('All trips')
   const [query, setQuery] = useState('')
-  const [savedOnly, setSavedOnly] = useState(false)
+  const [route, setRoute] = useState(readRoute)
+  const [atlas, setAtlas] = useState<AtlasState | null>(null)
+  const [unavailable, setUnavailable] = useState(false)
+  const savedOnly = route === '/saved'
   const [day, setDay] = useState('')
   const [compared, setCompared] = useState<string[]>([])
   const [showCompare, setShowCompare] = useState(false)
   const [saved, setSaved] = useState<string[]>(() => readLocal('sunday-atlas:saved', []))
-  const [bookings, setBookings] = useState<Booking[]>(() => readLocal('sunday-atlas:bookings', []))
+  const departures = atlas?.departures ?? []
+  const bookings = atlas?.bookings ?? []
+  const detail = route.startsWith('/experiences/') ? trips.find(trip => trip.id === route.slice('/experiences/'.length)) : undefined
+  const dates = [...new Set(departures.map(item => item.date))]
+  const home = route === '/'
+  const catalog = home || route === '/experiences' || savedOnly
   const [selected, setSelected] = useState<Trip | null>(null)
-  const [showTrips, setShowTrips] = useState(false)
   const compareItems = trips.filter(trip => compared.includes(trip.id))
   const search = query.trim().toLowerCase()
   const visible = trips.filter(trip => (
     (!savedOnly || saved.includes(trip.id)) &&
     (filter === 'All trips' || trip.category === filter) &&
-    (!day || seatsLeft(trip, day, bookings) > 0) &&
+    (!day || seatsLeft(trip, day, departures) > 0) &&
     [trip.name, trip.category, trip.location, trip.line].join(' ').toLowerCase().includes(search)
   ))
 
@@ -272,40 +318,78 @@ export function App() {
     storeLocal('sunday-atlas:saved', next)
   }
 
-  function updateBookings(next: Booking[]) {
-    setBookings(next)
-    storeLocal('sunday-atlas:bookings', next)
+  async function refresh() {
+    try {
+      setAtlas(await api<AtlasState>('state'))
+      setUnavailable(false)
+    } catch {
+      setUnavailable(true)
+    }
+  }
+
+  useEffect(() => {
+    void refresh()
+    const onRoute = () => {
+      const next = readRoute()
+      if (next === '/saved') reset()
+      setSelected(null)
+      setShowCompare(false)
+      setRoute(next)
+      window.scrollTo({ top: 0, behavior: 'instant' })
+      if (next === '/bookings') void refresh()
+    }
+    window.addEventListener('hashchange', onRoute)
+    return () => window.removeEventListener('hashchange', onRoute)
+  }, [])
+
+  function open(trip: Trip) {
+    window.location.hash = '/experiences/' + trip.id
+  }
+
+  async function book(input: BookingInput) {
+    try {
+      const booking = await api<Booking>('bookings', { method: 'POST', body: JSON.stringify(input) })
+      await refresh()
+      return booking
+    } catch (error) {
+      await refresh()
+      throw error
+    }
+  }
+
+  async function cancelBooking(id: string) {
+    const updated = await api<Booking>('bookings/' + id, { method: 'DELETE' })
+    setAtlas(previous => previous && ({ ...previous, bookings: previous.bookings.map(item => item.id === id ? updated : item) }))
+    void refresh()
   }
 
   function reset() {
     setFilter('All trips')
-    setSavedOnly(false)
     setQuery('')
     setDay('')
   }
 
   return (
     <>
-      <a className="skip" href="#explore">Skip to trips</a>
+      <a className="skip" href="#main-content" onClick={event => { event.preventDefault(); document.getElementById('main-content')?.scrollIntoView() }}>Skip to content</a>
       <header className="site-header">
         <div className="shell nav">
-          <a className="brand" href="#" onClick={reset}><span className="brand-mark"><Compass size={23} /></span> Sunday Atlas<span className="brand-dot">.</span></a>
+          <a className="brand" href="#/" onClick={reset}><span className="brand-mark"><Compass size={23} /></span> Sunday Atlas<span className="brand-dot">.</span></a>
           <nav aria-label="Main">
-            <a className="nav-explore" href="#explore" onClick={reset}>Explore</a>
-            <a href="#explore" className={'nav-saved' + (savedOnly ? ' selected' : '')}
-              onClick={() => { reset(); setSavedOnly(true) }}>
+            <a className="nav-explore" href="#/experiences" onClick={reset}>Explore</a>
+            <a href="#/saved" className="nav-saved" aria-current={savedOnly ? 'page' : undefined}>
               <Heart size={17} /> <span>Saved</span>{saved.length > 0 && <span className="nav-count">{saved.length}</span>}
             </a>
-            <button type="button" className="trip-nav" onClick={() => setShowTrips(true)}><Ticket size={17} /> <span>My trips</span>{bookings.length > 0 && <span className="nav-count">{bookings.length}</span>}</button>
+            <a className="trip-nav" href="#/bookings" aria-current={route === '/bookings' ? 'page' : undefined}><Ticket size={17} /> <span>My trips</span></a>
           </nav>
         </div>
       </header>
-      <main>
-        <Feature onExplore={reset} onOpen={setSelected} />
-        <section id="explore" className="shell explore" aria-labelledby="explore-title">
+      {catalog && <main id="main-content">
+        {home && <Feature onExplore={reset} onOpen={open} />}
+        <section id="explore" className={'shell explore' + (home ? '' : ' standalone-catalog')} aria-labelledby="explore-title">
           <div className="explore-heading">
             <div>
-              <h2 id="explore-title">{savedOnly ? 'Saved trips' : 'Find your kind of outside.'}</h2>
+              <h2 id="explore-title">{savedOnly ? 'Saved experiences' : 'Explore Delhi NCR'}</h2>
               <p aria-live="polite">{visible.length} {visible.length === 1 ? 'experience' : 'experiences'}{savedOnly ? ' saved' : ' around Delhi NCR'}</p>
             </div>
             <div className="search">
@@ -319,18 +403,18 @@ export function App() {
               {categories.map(category => <button type="button" key={category} aria-pressed={filter === category}
                 onClick={() => setFilter(category)}>{category}</button>)}
             </div>}
-            <label className="date-filter"><CalendarDays size={17} aria-hidden="true" />
+            {dates.length > 0 && <label className="date-filter"><CalendarDays size={17} aria-hidden="true" />
               <select value={day} aria-label="Filter by date" onChange={event => setDay(event.target.value)}>
                 <option value="">Any date</option>
-                {weekendDates().map(value => <option value={value} key={value}>{dateLabel(value)}</option>)}
+                {dates.map(value => <option value={value} key={value}>{dateLabel(value)}</option>)}
               </select>
-            </label>
+            </label>}
           </div>
           {visible.length ? (
             <div className={'trip-grid' + (visible.length === 3 ? ' gallery' : '')}>
               {visible.map(trip => <TripCard key={trip.id} trip={trip} saved={saved.includes(trip.id)}
                 compared={compared.includes(trip.id)}
-                onSave={() => toggleSaved(trip.id)} onOpen={() => setSelected(trip)}
+                onSave={() => toggleSaved(trip.id)} onOpen={() => open(trip)}
                 onCompare={() => setCompared(current => current.includes(trip.id) ? current.filter(id => id !== trip.id) : [...current, trip.id])} />)}
             </div>
           ) : <div className="empty">
@@ -339,8 +423,20 @@ export function App() {
             <button className="text-button" type="button" onClick={reset}>Show all trips <ChevronRight size={17} /></button>
           </div>}
         </section>
-      </main>
-      <footer className="shell site-footer"><span>Sunday Atlas</span><span>Booking experience prototype</span></footer>
+      </main>}
+      {detail && <Destination key={detail.id} trip={detail} saved={saved.includes(detail.id)}
+        slots={departures.filter(item => item.trip === detail.id && item.remaining > 0)}
+        onSave={() => toggleSaved(detail.id)} onBook={() => setSelected(detail)} />}
+      {route === '/bookings' && <MyTrips bookings={bookings} onCancel={cancelBooking} refresh={() => void refresh()} />}
+      {route === '/operator' && <Operator />}
+      {!catalog && !detail && !['/bookings', '/operator'].includes(route) &&
+        <main id="main-content" className="shell utility-page"><h1>Experience not found</h1><a href="#/experiences">Explore all experiences</a></main>}
+      <footer className="shell site-footer"><span>Sunday Atlas</span>
+        <a href="#/experiences">Explore</a>
+        {atlas?.operator && <a href="#/operator">Operator desk</a>}
+        {atlas?.sample && <span>Sample departures</span>}
+        {unavailable && <span>Catalog only · departures to be announced</span>}
+      </footer>
       {compared.length > 0 && <aside className="compare-tray" aria-label="Selected for comparison">
         <div className="compare-count"><Columns2 size={21} /><span><strong>{compared.length} selected</strong><small>{compared.length === 1 ? 'Choose another trip to compare' : 'Compare your shortlist'}</small></span></div>
         <div className="compare-actions">
@@ -348,13 +444,11 @@ export function App() {
           <button type="button" className="primary" disabled={compared.length < 2} onClick={() => setShowCompare(true)}>Compare trips <ArrowRight size={16} /></button>
         </div>
       </aside>}
-      {showCompare && <CompareDialog items={compareItems} date={day} bookings={bookings}
-        onClose={() => setShowCompare(false)} onOpen={trip => { setShowCompare(false); setSelected(trip) }} />}
-      {selected && <BookingDialog trip={selected} bookings={bookings} initialDate={day}
-        onBook={booking => updateBookings([...bookings, booking])}
-        onClose={() => setSelected(null)} onTrips={() => { setSelected(null); setShowTrips(true) }} />}
-      {showTrips && <MyTrips bookings={bookings} onClose={() => setShowTrips(false)}
-        onCancel={id => updateBookings(bookings.filter(booking => booking.id !== id))} />}
+      {showCompare && <CompareDialog items={compareItems} date={day} departures={departures}
+        onClose={() => setShowCompare(false)} onOpen={trip => { setShowCompare(false); open(trip) }} />}
+      {selected && atlas && <BookingDialog trip={selected} departures={departures} initialDate={day} sample={atlas.sample}
+        onBook={book}
+        onClose={() => setSelected(null)} onTrips={() => { setSelected(null); window.location.hash = '/bookings' }} />}
     </>
   )
 }
