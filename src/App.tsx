@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
-  ArrowDown, ArrowLeft, ArrowRight, CalendarDays, Check, ChevronRight, Clock3, Compass,
-  Heart, MapPin, Minus, Plus, Search, Ticket, Users, X,
+  ArrowLeft, ArrowRight, ArrowUpRight, CalendarDays, Check, ChevronRight, Clock3, Compass,
+  Columns2, Heart, MapPin, Minus, Plus, Search, Ticket, Users, X,
 } from 'lucide-react'
-import { dateLabel, money, trips, weekendDates, type Booking, type Category, type Trip } from './trips'
+import { dateLabel, money, seatsLeft, trips, weekendDates, type Booking, type Trip } from './trips'
+import { Feature } from './Feature'
 
 const categories = ['All trips', 'Heritage', 'Workshops', 'Outdoors'] as const
 type Filter = (typeof categories)[number]
@@ -55,45 +56,76 @@ function Modal({ children, onClose, title, side = false }: {
   )
 }
 
-function TripCard({ trip, saved, onSave, onOpen }: {
-  trip: Trip; saved: boolean; onSave: () => void; onOpen: () => void
+function TripCard({ trip, saved, compared, onSave, onCompare, onOpen }: {
+  trip: Trip; saved: boolean; compared: boolean
+  onSave: () => void; onCompare: () => void; onOpen: () => void
 }) {
   return (
-    <article className="trip-card">
+    <article className={'trip-card trip-card--' + trip.id}>
       <div className="card-media">
         <img src={trip.image} alt={trip.alt} width="560" height="370" />
+      </div>
+      <div className="card-top">
         <span className="category-label">{trip.category}</span>
         <button className={'icon-button save' + (saved ? ' is-saved' : '')} type="button"
           aria-label={saved ? 'Remove ' + trip.name + ' from saved trips' : 'Save ' + trip.name}
           aria-pressed={saved} onClick={onSave}><Heart size={19} /></button>
       </div>
       <div className="card-content">
-        <p className="eyeline"><MapPin size={14} /> {trip.location}</p>
+        <p className="eyeline"><MapPin size={14} /> {trip.location} <span aria-hidden="true">·</span> {trip.duration}</p>
         <h3>{trip.name}</h3>
         <p className="card-description">{trip.line}</p>
         <div className="card-bottom">
           <div className="price"><strong>{money(trip.price)}</strong> <span>/ person</span></div>
-          <button className="card-link" onClick={onOpen} type="button">View trip <ArrowRight size={16} /></button>
+          <button className="card-link" onClick={onOpen} type="button">View trip <ArrowUpRight size={16} /></button>
         </div>
+        <button className="compare-toggle" type="button" aria-pressed={compared}
+          aria-label={compared ? 'Remove ' + trip.name + ' from comparison' : 'Compare ' + trip.name}
+          onClick={onCompare}>{compared ? <Check size={15} /> : <Columns2 size={15} />} {compared ? 'Added to compare' : 'Compare'}</button>
       </div>
     </article>
   )
 }
 
-function BookingDialog({ trip, bookings, onBook, onClose, onTrips }: {
-  trip: Trip; bookings: Booking[]; onBook: (booking: Booking) => void; onClose: () => void; onTrips: () => void
+function CompareDialog({ items, date, bookings, onClose, onOpen }: {
+  items: Trip[]; date: string; bookings: Booking[]; onClose: () => void; onOpen: (trip: Trip) => void
+}) {
+  return (
+    <Modal title="Compare trips" onClose={onClose}>
+      <div className="dialog-content compare-content">
+        <h2>Compare trips</h2>
+        <p>{date ? 'Availability for ' + dateLabel(date) : 'Price, duration, and group size at a glance.'}</p>
+        <div className="compare-scroll" role="region" aria-label="Trip comparison" tabIndex={0}>
+          <table className="compare-table">
+            <thead><tr><th scope="col">Trip</th>{items.map(trip => <th scope="col" key={trip.id}>
+              <img src={trip.image} alt="" width="180" height="98" />{trip.name}
+            </th>)}</tr></thead>
+            <tbody>
+              <tr><th scope="row">Per person</th>{items.map(trip => <td key={trip.id}>{money(trip.price)}</td>)}</tr>
+              <tr><th scope="row">Duration</th>{items.map(trip => <td key={trip.id}>{trip.duration}</td>)}</tr>
+              <tr><th scope="row">Starts at</th>{items.map(trip => <td key={trip.id}>{trip.time}</td>)}</tr>
+              <tr><th scope="row">{date ? 'Spots left' : 'Group size'}</th>{items.map(trip => <td key={trip.id}>{date ? seatsLeft(trip, date, bookings) : 'Up to ' + trip.capacity}</td>)}</tr>
+              <tr><th scope="row">Location</th>{items.map(trip => <td key={trip.id}>{trip.location}</td>)}</tr>
+              <tr><td />{items.map(trip => <td key={trip.id}><button className="text-button" type="button"
+                aria-label={'View ' + trip.name} onClick={() => onOpen(trip)}>View trip <ArrowUpRight size={15} /></button></td>)}</tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+function BookingDialog({ trip, bookings, initialDate, onBook, onClose, onTrips }: {
+  trip: Trip; bookings: Booking[]; initialDate: string; onBook: (booking: Booking) => void; onClose: () => void; onTrips: () => void
 }) {
   const [stage, setStage] = useState<'choose' | 'review' | 'done'>('choose')
-  const [date, setDate] = useState('')
+  const [date, setDate] = useState(() => initialDate && seatsLeft(trip, initialDate, bookings) ? initialDate : '')
   const [guests, setGuests] = useState(1)
   const [reference, setReference] = useState('')
   const dates = weekendDates()
   const headline = useRef<HTMLHeadingElement>(null)
-  function available(day: string) {
-    const booked = bookings.filter(booking => booking.trip === trip.id && booking.date === day)
-      .reduce((total, booking) => total + booking.guests, 0)
-    return Math.max(0, trip.capacity - booked)
-  }
+  const available = (day: string) => seatsLeft(trip, day, bookings)
   const seats = date ? available(date) : trip.capacity
   const canBook = dates.includes(date) && guests <= seats
   const total = money(trip.price * guests)
@@ -124,6 +156,11 @@ function BookingDialog({ trip, bookings, onBook, onClose, onTrips }: {
             <details className="includes">
               <summary>What’s included</summary>
               <ul>{trip.includes.map(item => <li key={item}><Check size={14} /> {item}</li>)}</ul>
+            </details>
+            <details className="includes itinerary">
+              <summary>Itinerary and meeting point</summary>
+              <p>{trip.meeting}</p>
+              <ol>{trip.itinerary.map(item => <li key={item}>{item}</li>)}</ol>
             </details>
             <fieldset className="date-field">
               <legend>Choose a date</legend>
@@ -213,14 +250,19 @@ export function App() {
   const [filter, setFilter] = useState<Filter>('All trips')
   const [query, setQuery] = useState('')
   const [savedOnly, setSavedOnly] = useState(false)
+  const [day, setDay] = useState('')
+  const [compared, setCompared] = useState<string[]>([])
+  const [showCompare, setShowCompare] = useState(false)
   const [saved, setSaved] = useState<string[]>(() => readLocal('sunday-atlas:saved', []))
   const [bookings, setBookings] = useState<Booking[]>(() => readLocal('sunday-atlas:bookings', []))
   const [selected, setSelected] = useState<Trip | null>(null)
   const [showTrips, setShowTrips] = useState(false)
+  const compareItems = trips.filter(trip => compared.includes(trip.id))
   const search = query.trim().toLowerCase()
   const visible = trips.filter(trip => (
     (!savedOnly || saved.includes(trip.id)) &&
-    (filter === 'All trips' || trip.category === filter as Category) &&
+    (filter === 'All trips' || trip.category === filter) &&
+    (!day || seatsLeft(trip, day, bookings) > 0) &&
     [trip.name, trip.category, trip.location, trip.line].join(' ').toLowerCase().includes(search)
   ))
 
@@ -239,6 +281,7 @@ export function App() {
     setFilter('All trips')
     setSavedOnly(false)
     setQuery('')
+    setDay('')
   }
 
   return (
@@ -250,42 +293,45 @@ export function App() {
           <nav aria-label="Main">
             <a className="nav-explore" href="#explore" onClick={reset}>Explore</a>
             <a href="#explore" className={'nav-saved' + (savedOnly ? ' selected' : '')}
-              onClick={() => { setSavedOnly(true); setFilter('All trips'); setQuery('') }}>
+              onClick={() => { reset(); setSavedOnly(true) }}>
               <Heart size={17} /> <span>Saved</span>{saved.length > 0 && <span className="nav-count">{saved.length}</span>}
             </a>
             <button type="button" className="trip-nav" onClick={() => setShowTrips(true)}><Ticket size={17} /> <span>My trips</span>{bookings.length > 0 && <span className="nav-count">{bookings.length}</span>}</button>
           </nav>
         </div>
       </header>
-      <main className="shell">
-        <section className="hero" aria-labelledby="hero-title">
-          <img className="hero-image" src={import.meta.env.BASE_URL + 'images/hero.webp'} fetchPriority="high"
-            alt="Sunlight over an old sandstone arch and gardens in Delhi" />
-          <div className="hero-copy">
-            <p className="hero-kicker"><MapPin size={15} /> Day trips from Delhi</p>
-            <h1 id="hero-title">Good days are <em>closer.</em></h1>
-            <p>Small-group walks, workshops and outdoor escapes for your next free weekend.</p>
-            <a href="#explore" className="hero-cta" onClick={reset}>Find a day trip <ArrowDown size={17} /></a>
-          </div>
-        </section>
-        <section id="explore" className="explore" aria-labelledby="explore-title">
+      <main>
+        <Feature onExplore={reset} onOpen={setSelected} />
+        <section id="explore" className="shell explore" aria-labelledby="explore-title">
           <div className="explore-heading">
-            <div><h2 id="explore-title">{savedOnly ? 'Saved trips' : 'Find your next escape'}</h2>
-              <p aria-live="polite">{visible.length} {visible.length === 1 ? 'trip' : 'trips'}{savedOnly ? ' saved' : ' to explore'}</p></div>
+            <div>
+              <h2 id="explore-title">{savedOnly ? 'Saved trips' : 'Find your kind of outside.'}</h2>
+              <p aria-live="polite">{visible.length} {visible.length === 1 ? 'experience' : 'experiences'}{savedOnly ? ' saved' : ' around Delhi NCR'}</p>
+            </div>
             <div className="search">
               <Search size={18} aria-hidden="true" />
               <input type="search" name="trip-search" aria-label="Search trips" placeholder="Search trips or places"
                 value={query} onChange={event => setQuery(event.target.value)} />
             </div>
           </div>
-          {!savedOnly && <div className="filters" aria-label="Filter by trip type">
-            {categories.map(category => <button type="button" key={category} aria-pressed={filter === category}
-              onClick={() => setFilter(category)}>{category}</button>)}
-          </div>}
+          <div className="filter-bar">
+            {!savedOnly && <div className="filters" aria-label="Filter by trip type">
+              {categories.map(category => <button type="button" key={category} aria-pressed={filter === category}
+                onClick={() => setFilter(category)}>{category}</button>)}
+            </div>}
+            <label className="date-filter"><CalendarDays size={17} aria-hidden="true" />
+              <select value={day} aria-label="Filter by date" onChange={event => setDay(event.target.value)}>
+                <option value="">Any date</option>
+                {weekendDates().map(value => <option value={value} key={value}>{dateLabel(value)}</option>)}
+              </select>
+            </label>
+          </div>
           {visible.length ? (
-            <div className="trip-grid">
+            <div className={'trip-grid' + (visible.length === 3 ? ' gallery' : '')}>
               {visible.map(trip => <TripCard key={trip.id} trip={trip} saved={saved.includes(trip.id)}
-                onSave={() => toggleSaved(trip.id)} onOpen={() => setSelected(trip)} />)}
+                compared={compared.includes(trip.id)}
+                onSave={() => toggleSaved(trip.id)} onOpen={() => setSelected(trip)}
+                onCompare={() => setCompared(current => current.includes(trip.id) ? current.filter(id => id !== trip.id) : [...current, trip.id])} />)}
             </div>
           ) : <div className="empty">
             {savedOnly ? <Heart size={31} /> : <Search size={31} />}
@@ -295,7 +341,16 @@ export function App() {
         </section>
       </main>
       <footer className="shell site-footer"><span>Sunday Atlas</span><span>Booking experience prototype</span></footer>
-      {selected && <BookingDialog trip={selected} bookings={bookings}
+      {compared.length > 0 && <aside className="compare-tray" aria-label="Selected for comparison">
+        <div className="compare-count"><Columns2 size={21} /><span><strong>{compared.length} selected</strong><small>{compared.length === 1 ? 'Choose another trip to compare' : 'Compare your shortlist'}</small></span></div>
+        <div className="compare-actions">
+          <button type="button" className="text-button" onClick={() => setCompared([])}>Clear</button>
+          <button type="button" className="primary" disabled={compared.length < 2} onClick={() => setShowCompare(true)}>Compare trips <ArrowRight size={16} /></button>
+        </div>
+      </aside>}
+      {showCompare && <CompareDialog items={compareItems} date={day} bookings={bookings}
+        onClose={() => setShowCompare(false)} onOpen={trip => { setShowCompare(false); setSelected(trip) }} />}
+      {selected && <BookingDialog trip={selected} bookings={bookings} initialDate={day}
         onBook={booking => updateBookings([...bookings, booking])}
         onClose={() => setSelected(null)} onTrips={() => { setSelected(null); setShowTrips(true) }} />}
       {showTrips && <MyTrips bookings={bookings} onClose={() => setShowTrips(false)}

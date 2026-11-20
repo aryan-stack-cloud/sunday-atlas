@@ -8,12 +8,14 @@ A responsive booking prototype for small-group experiences around Delhi NCR. Exp
 
 ## UX case study
 
+The second design pass uses immersive carousel photography and an asymmetric gallery, taking inspiration from [Pinterest's travel curation and visual planning examples](https://business.pinterest.com/en-gb/blog/where-passion-meets-planning-pinterest-travel-bookings/?change_language=true&filters=best-practices). The artwork and application layout are original.
+
 **Design question.** Can someone compare nearby weekend plans and see exactly what they’re booking in a few steps?
 
 | Decision | How it appears in the product |
 |---|---|
-| Compare before opening a trip | Cards show the area, activity type and per-person price. Search and category filters narrow the list. |
-| Make availability and cost visible early | Date choices show times and sold-out states. The price updates as guests change and appears again in the booking review. |
+| Compare before opening a trip | The featured carousel leads into an asymmetric gallery. Search, category, and date filters narrow the list. A comparison table shows price, duration, start time, and group size or seats remaining. |
+| Make availability and cost visible early | Date choices show times and sold-out states in Delhi local time. The selected date carries into the booking flow. The price updates as guests change and appears again in the booking review. |
 | Let people revisit a decision | Saved trips and demo bookings survive a reload. Bookings can be cancelled from My trips. |
 | Support keyboard and mobile use | Dialogs trap focus, restore it on close, and respond to Escape. The layout supports 320px screens and reduced motion. |
 
