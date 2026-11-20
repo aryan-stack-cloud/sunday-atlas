@@ -4,9 +4,9 @@ import { operatorKey } from '../playwright.config'
 test('filters and saves experiences across reloads', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Delhi, rediscovered.' })).toBeVisible()
-  await expect(page.getByRole('article')).toHaveCount(3)
+  await expect(page.locator('#explore').getByRole('article')).toHaveCount(3)
   await page.getByRole('button', { name: 'Workshops' }).click()
-  await expect(page.getByRole('article')).toHaveCount(1)
+  await expect(page.locator('#explore').getByRole('article')).toHaveCount(1)
   await page.getByRole('button', { name: 'Save Hands in clay' }).click()
   await page.reload()
   await page.getByRole('link', { name: /Saved/ }).click()
@@ -15,7 +15,7 @@ test('filters and saves experiences across reloads', async ({ page }) => {
   await expect(page.getByText('No saved trips yet')).toBeVisible()
   await page.getByRole('link', { name: 'Explore', exact: true }).first().click()
   await page.getByRole('searchbox').fill('Noida')
-  await expect(page.getByRole('article')).toHaveCount(1)
+  await expect(page.locator('#explore').getByRole('article')).toHaveCount(1)
 })
 
 test('opens a destination, saves a request, and cancels it after reload', async ({ page }) => {
@@ -100,4 +100,31 @@ test('shares capacity across sessions and protects operator actions', async ({ b
     expect((await visitor.request.delete('/api/bookings/' + booking.id)).status()).toBe(200)
     expect((await other.request.post('/api/bookings', { data: input })).status()).toBe(201)
   } finally { await visitor.close(); await other.close() }
+})
+
+test('scrolls into the animated trip deck and reveals the selected experience', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Pause scene motion' }).click()
+  await expect(page.getByRole('button', { name: 'Resume scene motion' })).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('button', { name: 'Trip cards', exact: true }).click()
+  const deck = page.getByRole('region', { name: 'Pick a card. Find a trip.' })
+  await expect(deck.getByRole('heading', { name: 'Pick a card. Find a trip.' })).toBeInViewport()
+  await deck.getByRole('button', { name: 'Next trip card' }).click()
+  await deck.getByRole('button', { name: 'Reveal A morning in the reeds' }).click()
+  await expect(deck.getByRole('button', { name: 'Reveal A morning in the reeds' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(deck.getByRole('heading', { name: 'A morning in the reeds' })).toBeVisible()
+  await deck.getByRole('button', { name: 'View itinerary' }).click()
+  await expect(page.getByRole('heading', { name: 'Okhla', exact: true })).toBeVisible()
+})
+
+test('fits a narrow screen and respects reduced motion', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 760 })
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.goto('/')
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(320)
+  await expect(page.getByRole('button', { name: 'Pause scene motion' })).toBeHidden()
+  await page.getByRole('button', { name: 'Trip cards', exact: true }).click()
+  await page.getByRole('button', { name: 'Previous trip card' }).click()
+  await page.getByRole('button', { name: 'Reveal Lodhi before the crowds' }).click()
+  await expect(page.getByRole('button', { name: 'Reveal Lodhi before the crowds' })).toHaveAttribute('aria-pressed', 'true')
 })

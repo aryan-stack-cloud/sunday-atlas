@@ -372,7 +372,7 @@ export function App() {
   return (
     <>
       <a className="skip" href="#main-content" onClick={event => { event.preventDefault(); document.getElementById('main-content')?.scrollIntoView() }}>Skip to content</a>
-      <header className="site-header">
+      <header className={'site-header' + (home ? ' site-header--story' : '')}>
         <div className="shell nav">
           <a className="brand" href="#/" onClick={reset}><span className="brand-mark"><Compass size={23} /></span> Sunday Atlas<span className="brand-dot">.</span></a>
           <nav aria-label="Main">
