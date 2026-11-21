@@ -1,15 +1,17 @@
 import { useRef, useState, type PointerEvent } from 'react'
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUpRight, Clock3, MapPin, Pause, Play } from 'lucide-react'
-import { money, trips, type Trip } from './trips'
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUpRight, Compass, Pause, Play } from 'lucide-react'
+import { trips, type Trip } from './trips'
 
+import { cardArt, guides } from './guide'
 import { useScrollStory } from './useScrollStory'
 import { Lights, TripDeck } from './TripDeck'
 
-const covers = [import.meta.env.BASE_URL + 'images/delhi-twilight.webp', trips[1].image, trips[2].image]
+const covers = [import.meta.env.BASE_URL + 'images/lodhi-panorama.webp', trips[1].image, trips[2].image]
 
 export function Feature({ onExplore, onOpen }: { onExplore: () => void; onOpen: (trip: Trip) => void }) {
   const [current, setCurrent] = useState(0)
   const trip = trips[current]
+  const guide = guides[trip.id]
   const [paused, setPaused] = useState(false)
   const story = useRef<HTMLDivElement>(null)
   useScrollStory(story, paused)
@@ -51,44 +53,29 @@ export function Feature({ onExplore, onOpen }: { onExplore: () => void; onOpen: 
             key={cover} src={cover} alt="" fetchPriority={index === 0 ? 'high' : 'low'} />
         ))}
         <Lights className="hero-lights" />
-        <img className="scene-reeds" src={import.meta.env.BASE_URL + 'images/river-reeds.webp'} alt="" />
         <div className="shell feature-layout">
-          <div className="feature-copy">
-            <p className="section-kicker"><MapPin size={15} /> Day trips from Delhi NCR</p>
-            <h1 id="hero-title">Delhi,<br /><em>rediscovered.</em></h1>
-            <p>Find small-group walks, workshops and nature escapes around Delhi NCR.</p>
-            <a href="#/experiences" className="feature-cta" onClick={onExplore}>Explore trips <ArrowUpRight size={17} /></a>
-            <button type="button" className="chapter-link" onClick={showCards}>
-              Trip cards <ArrowDown size={16} />
-            </button>
+          <div key={trip.id} className="feature-copy">
+            <p className="section-kicker"><span className="rule" /> Delhi field guide <span>/</span> {trip.category}</p>
+            <h1 id="hero-title">{guide.place}<br /><em>{guide.subtitle}.</em></h1>
+            <p>{trip.line}</p>
+            <button className="feature-cta" type="button" aria-label={'Open featured trip: ' + trip.name} onClick={() => onOpen(trip)}>Open field guide <ArrowUpRight size={17} /></button>
+            <button type="button" className="chapter-link" onClick={showCards}>Trip cards <ArrowDown size={16}/></button>
           </div>
           <div className="feature-pager" role="group" aria-label="Featured experiences">
-            <div className="feature-arrows">
-              <button type="button" aria-label="Previous featured trip" onClick={() => step(-1)}><ArrowLeft size={17} /></button>
-              <button type="button" aria-label="Next featured trip" onClick={() => step(1)}><ArrowRight size={17} /></button>
+            <div className="feature-arrows"><span className="edition-label">Postcards / 0{current + 1} of 03</span>
+              <button type="button" aria-label="Previous featured trip" onClick={() => step(-1)}><ArrowLeft size={16}/></button>
+              <button type="button" aria-label="Next featured trip" onClick={() => step(1)}><ArrowRight size={16}/></button>
             </div>
-            <button className="feature-ticket" type="button" onClick={() => onOpen(trip)} aria-label={'Open featured trip: ' + trip.name}>
-              <img src={trip.image} width="72" height="70" alt="" />
-              <span className="feature-ticket-content" aria-live="polite">
-                <span className="feature-label">{trip.category}</span>
-                <strong>{trip.name}</strong>
-                <span className="feature-facts"><Clock3 size={13} /> {trip.duration} <span>·</span> {money(trip.price)}</span>
-              </span>
-              <ArrowUpRight size={19} />
-            </button>
-            <div className="feature-postcards" aria-label="Choose a featured trip">
-              {trips.map((item, index) => (
-                <button key={item.id} type="button" aria-label={'Feature ' + item.name}
-                  aria-pressed={index === current} onClick={() => setCurrent(index)}>
-                  <img src={item.image} alt="" /><span>{item.category}</span>
-                </button>
-              ))}
-            </div>
+            <div className="feature-postcards">{trips.map((item, index) =>
+              <button key={item.id} type="button" aria-label={'Feature ' + item.name}
+                aria-pressed={index === current} onClick={() => setCurrent(index)}>
+                <img src={cardArt(item)} alt=""/><span>{guides[item.id].place}</span>
+              </button>)}</div>
           </div>
+          <div className="feature-colophon"><span><Compass size={15}/> {trip.location}</span><a href="#/experiences" onClick={onExplore}>Browse the atlas <ArrowUpRight size={15}/></a></div>
         </div>
-
       </section>
-      <TripDeck onOpen={onOpen} />
+      <TripDeck onOpen={onOpen} active={current} onSelect={setCurrent} />
         <button type="button" className="motion-control" aria-label={paused ? 'Resume scene motion' : 'Pause scene motion'} aria-pressed={paused}
           onClick={() => setPaused(value => !value)}>{paused ? <Play size={15} /> : <Pause size={15} />}</button>
         <div className="scroll-progress" aria-hidden="true"><span /></div>

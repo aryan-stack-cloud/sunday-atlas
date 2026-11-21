@@ -4,11 +4,16 @@ import {
   Columns2, Heart, MapPin, Minus, Plus, Search, Ticket, Users, X,
 } from 'lucide-react'
 import { dateLabel, money, seatsLeft, trips, type Booking, type Departure, type Trip } from './trips'
+import { flushSync } from 'react-dom'
+import { AtlasMap } from './AtlasMap'
+import { Daybook } from './Planner'
+import { useDayPlan } from './planning'
 import { Feature } from './Feature'
 import { Destination } from './Destination'
 import { Operator } from './Operator'
 import { api, type AtlasState, type BookingInput } from './api'
 
+const staticEdition = import.meta.env.VITE_ATLAS_HOST === 'pages'
 const categories = ['All trips', 'Heritage', 'Workshops', 'Outdoors'] as const
 type Filter = (typeof categories)[number]
 
@@ -230,7 +235,7 @@ function BookingDialog({ trip, departures, initialDate, sample, onBook, onClose,
           <span className="success-icon"><Check size={28} /></span>
           <h2 ref={headline} tabIndex={-1}>Request received.</h2>
           <p>{trip.name} · {dateLabel(date)} · {guests} {guests === 1 ? 'guest' : 'guests'}</p>
-          <p className="reference">Booking reference {reference}</p><p>Check My trips for confirmation from the operator.</p>
+          <p className="reference">Booking reference {reference}</p><p>Check your daybook for confirmation from the operator.</p>
           <button type="button" className="primary" onClick={onTrips}>See my trips <ArrowRight size={17} /></button>
         </div>
       )}
@@ -252,8 +257,8 @@ function MyTrips({ bookings, onCancel, refresh }: {
     finally { setPending(false) }
   }
   return (
-    <main id="main-content" className="shell utility-page">
-      <div className="utility-heading"><h1>My trips</h1><button className="secondary" type="button" onClick={refresh}>Refresh status</button></div>
+    <section className="shell utility-page booking-ledger">
+      <div className="utility-heading"><h2>Reservation requests</h2><button className="secondary" type="button" onClick={refresh}>Refresh status</button></div>
       {message && <p role="alert">{message}</p>}
       {bookings.length ? bookings.map(booking => {
         const trip = trips.find(item => item.id === booking.trip)
@@ -277,7 +282,7 @@ function MyTrips({ bookings, onCancel, refresh }: {
           </article>
         )
       }) : <div className="empty"><Ticket size={30} /><h3>No bookings yet</h3><a className="primary" href="#/experiences">Explore trips <ArrowRight size={17} /></a></div>}
-    </main>
+    </section>
   )
 }
 
@@ -286,6 +291,7 @@ function readRoute() {
 }
 
 export function App() {
+  const planner = useDayPlan()
   const [filter, setFilter] = useState<Filter>('All trips')
   const [query, setQuery] = useState('')
   const [route, setRoute] = useState(readRoute)
@@ -312,6 +318,11 @@ export function App() {
     [trip.name, trip.category, trip.location, trip.line].join(' ').toLowerCase().includes(search)
   ))
 
+  useEffect(() => {
+    const name = detail?.name || ({ '/experiences': 'Destination atlas', '/saved': 'Saved postcards', '/bookings': 'My daybook', '/operator': 'Operator desk' } as Record<string, string>)[route]
+    document.title = name ? name + ' | Sunday Atlas' : 'Sunday Atlas — Day trips from Delhi'
+  }, [route, detail])
+
   function toggleSaved(id: string) {
     const next = saved.includes(id) ? saved.filter(item => item !== id) : [...saved, id]
     setSaved(next)
@@ -319,6 +330,7 @@ export function App() {
   }
 
   async function refresh() {
+    if (staticEdition) return
     try {
       setAtlas(await api<AtlasState>('state'))
       setUnavailable(false)
@@ -331,11 +343,20 @@ export function App() {
     void refresh()
     const onRoute = () => {
       const next = readRoute()
-      if (next === '/saved') reset()
-      setSelected(null)
-      setShowCompare(false)
-      setRoute(next)
-      window.scrollTo({ top: 0, behavior: 'instant' })
+      function showRoute() {
+        flushSync(() => {
+          if (next === '/saved') reset()
+          setSelected(null)
+          setShowCompare(false)
+          setRoute(next)
+        })
+        window.scrollTo({ top: 0, behavior: 'instant' })
+      }
+      if (document.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        document.startViewTransition(showRoute)
+      } else {
+        showRoute()
+      }
       if (next === '/bookings') void refresh()
     }
     window.addEventListener('hashchange', onRoute)
@@ -371,25 +392,28 @@ export function App() {
 
   return (
     <>
-      <a className="skip" href="#main-content" onClick={event => { event.preventDefault(); document.getElementById('main-content')?.scrollIntoView() }}>Skip to content</a>
+      <a className="skip" href="#main-content" onClick={event => { event.preventDefault(); const main = document.getElementById('main-content'); if (main) { main.tabIndex = -1; main.focus(); main.scrollIntoView() } }}>Skip to content</a>
       <header className={'site-header' + (home ? ' site-header--story' : '')}>
         <div className="shell nav">
           <a className="brand" href="#/" onClick={reset}><span className="brand-mark"><Compass size={23} /></span> Sunday Atlas<span className="brand-dot">.</span></a>
           <nav aria-label="Main">
-            <a className="nav-explore" href="#/experiences" onClick={reset}>Explore</a>
+            <a className="nav-explore" aria-current={route === '/experiences' ? 'page' : undefined} href="#/experiences" onClick={reset}>Explore</a>
             <a href="#/saved" className="nav-saved" aria-current={savedOnly ? 'page' : undefined}>
               <Heart size={17} /> <span>Saved</span>{saved.length > 0 && <span className="nav-count">{saved.length}</span>}
             </a>
-            <a className="trip-nav" href="#/bookings" aria-current={route === '/bookings' ? 'page' : undefined}><Ticket size={17} /> <span>My trips</span></a>
+            <a className="trip-nav" href="#/bookings" aria-current={route === '/bookings' ? 'page' : undefined}><Ticket size={17} /> <span>Daybook</span></a>
           </nav>
         </div>
       </header>
       {catalog && <main id="main-content">
         {home && <Feature onExplore={reset} onOpen={open} />}
+        {route === '/experiences' && <><div className="atlas-intro shell"><p className="edition-label">Sunday Atlas / Delhi NCR</p><h1>The destination <em>atlas.</em></h1><p>Pick a place on the map to open its field guide.</p></div><AtlasMap onOpen={open} /></>}
+        {savedOnly && <div className="saved-cover"><div className="shell"><div><p className="edition-label">Your collection</p><h1>Saved <em>postcards.</em></h1><a className="ink-link" href="#/bookings">Open my daybook <ArrowUpRight size={17}/></a></div>
+          <div className="saved-prints" aria-hidden="true">{trips.map(trip => <img key={trip.id} src={trip.image} alt=""/>)}</div></div></div>}
         <section id="explore" className={'shell explore' + (home ? '' : ' standalone-catalog')} aria-labelledby="explore-title">
           <div className="explore-heading">
             <div>
-              <h2 id="explore-title">{savedOnly ? 'Saved experiences' : 'Explore Delhi NCR'}</h2>
+              <h2 id="explore-title">{savedOnly ? 'Saved experiences' : 'The trip index'}</h2>
               <p aria-live="polite">{visible.length} {visible.length === 1 ? 'experience' : 'experiences'}{savedOnly ? ' saved' : ' around Delhi NCR'}</p>
             </div>
             <div className="search">
@@ -420,22 +444,27 @@ export function App() {
           ) : <div className="empty">
             {savedOnly ? <Heart size={31} /> : <Search size={31} />}
             <h3>{savedOnly && !search ? 'No saved trips yet' : 'No matching trips'}</h3>
-            <button className="text-button" type="button" onClick={reset}>Show all trips <ChevronRight size={17} /></button>
+            <button className="text-button" type="button" onClick={() => { reset(); if (savedOnly) window.location.hash = '/experiences' }}>Show all trips <ChevronRight size={17} /></button>
           </div>}
         </section>
       </main>}
       {detail && <Destination key={detail.id} trip={detail} saved={saved.includes(detail.id)}
         slots={departures.filter(item => item.trip === detail.id && item.remaining > 0)}
+        inPlan={planner.plan.ids.includes(detail.id)} onPlan={() => { planner.add(detail.id); window.location.hash = '/bookings' }}
         onSave={() => toggleSaved(detail.id)} onBook={() => setSelected(detail)} />}
-      {route === '/bookings' && <MyTrips bookings={bookings} onCancel={cancelBooking} refresh={() => void refresh()} />}
-      {route === '/operator' && <Operator />}
-      {!catalog && !detail && !['/bookings', '/operator'].includes(route) &&
+      {route === '/bookings' && <main id="main-content" className="daybook-page"><Daybook planner={planner}/>
+        {!staticEdition && atlas && <MyTrips bookings={bookings} onCancel={cancelBooking} refresh={() => void refresh()} />}
+        {unavailable && <p className="shell service-error" role="status">Reservation service unavailable. Your daybook is still accessible. <button onClick={() => void refresh()}>Retry connection</button></p>}
+      </main>}
+      {route === '/operator' && !staticEdition && <Operator />}
+      {!catalog && !detail && route !== '/bookings' && (route !== '/operator' || staticEdition) &&
         <main id="main-content" className="shell utility-page"><h1>Experience not found</h1><a href="#/experiences">Explore all experiences</a></main>}
-      <footer className="shell site-footer"><span>Sunday Atlas</span>
+      <footer className="shell site-footer"><a className="footer-wordmark" href="#/">Sunday Atlas<em>.</em></a>
         <a href="#/experiences">Explore</a>
+        <a href="#/bookings">Daybook</a>
         {atlas?.operator && <a href="#/operator">Operator desk</a>}
         {atlas?.sample && <span>Sample departures</span>}
-        {unavailable && <span>Catalog only · departures to be announced</span>}
+
       </footer>
       {compared.length > 0 && <aside className="compare-tray" aria-label="Selected for comparison">
         <div className="compare-count"><Columns2 size={21} /><span><strong>{compared.length} selected</strong><small>{compared.length === 1 ? 'Choose another trip to compare' : 'Compare your shortlist'}</small></span></div>

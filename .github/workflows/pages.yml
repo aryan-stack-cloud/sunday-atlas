@@ -25,6 +25,9 @@ jobs:
       - run: npm run test:server
       - run: npx playwright install --with-deps chromium
       - run: npm test
+      - run: npm run build
+        env:
+          VITE_ATLAS_HOST: pages
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

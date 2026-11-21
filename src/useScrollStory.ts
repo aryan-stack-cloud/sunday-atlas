@@ -18,7 +18,7 @@ export function useScrollStory(ref: RefObject<HTMLDivElement | null>, paused: bo
     function render() {
       frame = 0
       if (!story) return
-      const enabled = !paused && !reduced.matches
+      const enabled = !paused && !reduced.matches && window.innerHeight >= 520
       story.classList.toggle('scroll-story', enabled)
       if (!enabled) {
         if (deck) deck.style.removeProperty('pointer-events')

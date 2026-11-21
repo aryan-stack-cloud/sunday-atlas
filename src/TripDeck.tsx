@@ -12,19 +12,20 @@ export function Lights({ className = '' }: { className?: string }) {
   )
 }
 
-export function TripDeck({ onOpen }: { onOpen: (trip: Trip) => void }) {
-  const [active, setActive] = useState(1)
+export function TripDeck({ active, onSelect, onOpen }: {
+  active: number; onSelect: (index: number) => void; onOpen: (trip: Trip) => void
+}) {
   const [revealed, setRevealed] = useState(false)
   const trip = trips[active]
 
   function step(direction: number) {
-    setActive(index => (index + direction + trips.length) % trips.length)
+    onSelect((active + direction + trips.length) % trips.length)
     setRevealed(false)
   }
 
   function flip(index: number) {
     setRevealed(index !== active || !revealed)
-    setActive(index)
+    onSelect(index)
   }
 
   return (
@@ -45,7 +46,7 @@ export function TripDeck({ onOpen }: { onOpen: (trip: Trip) => void }) {
         <div className="deck-cards">
           {trips.map((item, index) => (
             <button type="button" key={item.id} className="deck-card"
-              data-active={index === active} aria-pressed={index === active && revealed}
+              data-position={['center', 'right', 'left'][(index - active + trips.length) % trips.length]} data-active={index === active} aria-pressed={index === active && revealed}
               aria-label={'Reveal ' + item.name} onClick={() => flip(index)}>
               <span className="deck-scroll-turn"><span className="deck-card-flip">
                 <span className="deck-card-face">

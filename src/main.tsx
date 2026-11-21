@@ -7,5 +7,6 @@ import './styles.css'
 import './journeys.css'
 import './motion.css'
 import './scroll-story.css'
+import './edition.css'
 
 createRoot(document.getElementById('root')!).render(<App />)
