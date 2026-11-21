@@ -6,7 +6,7 @@ Sunday Atlas is a Delhi NCR experience site with a destination catalog, shareabl
 
 ## Design case study
 
-The homepage follows the motion sequence in the [Kamui reference](https://in.pinterest.com/pin/800303796276346241/) with an illustrated parallax scene, a purple 3D trip-card deck, and a darker itinerary panel illuminated by floating lights. The site includes a pause control and respects reduced-motion settings. The [destination reference](https://in.pinterest.com/pin/1032520652057780971/) informed the image-led trip pages, oversized place names, and postcard navigation. The artwork, brand, and layouts are original.
+The homepage uses one scroll sequence that pins the landscape, eases it into rotating trip cards, and then introduces the selected itinerary. Reverse scrolling retraces the sequence. The catalog and destination pages use the same twilight palette and scroll reveals. The homepage follows the motion sequence in the [Kamui reference](https://in.pinterest.com/pin/800303796276346241/) with an illustrated parallax scene, a purple 3D trip-card deck, and a darker itinerary panel illuminated by floating lights. The site includes a pause control and respects reduced-motion settings. The [destination reference](https://in.pinterest.com/pin/1032520652057780971/) informed the image-led trip pages, oversized place names, and postcard navigation. The artwork, brand, and layouts are original.
 
 ![Sunday Atlas illustrated twilight scene](docs/desktop.webp)
 

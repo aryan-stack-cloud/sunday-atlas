@@ -30,6 +30,7 @@ export function TripDeck({ onOpen }: { onOpen: (trip: Trip) => void }) {
   return (
     <section id="trip-deck" className="trip-deck" aria-labelledby="deck-title">
       <div className="shell deck-shell">
+        <div className="deck-chapter">
         <div className="deck-heading">
           <div>
             <p className="section-kicker">Day trips around Delhi NCR</p>
@@ -46,7 +47,7 @@ export function TripDeck({ onOpen }: { onOpen: (trip: Trip) => void }) {
             <button type="button" key={item.id} className="deck-card"
               data-active={index === active} aria-pressed={index === active && revealed}
               aria-label={'Reveal ' + item.name} onClick={() => flip(index)}>
-              <span className="deck-card-flip">
+              <span className="deck-scroll-turn"><span className="deck-card-flip">
                 <span className="deck-card-face">
                   <img src={illustrations + 'card-' + item.id + '.webp'} alt="" width="360" height="560" loading="lazy" />
                   <span className="deck-card-title"><small>{item.category}</small><strong>{item.name}</strong></span>
@@ -58,9 +59,10 @@ export function TripDeck({ onOpen }: { onOpen: (trip: Trip) => void }) {
                   <span>{item.line}</span>
                   <span>{item.duration} · {money(item.price)} per person</span>
                 </span>
-              </span>
+              </span></span>
             </button>
           ))}
+        </div>
         </div>
         <article className="field-note" key={trip.id}>
           <div className="field-note-visual" aria-hidden="true">

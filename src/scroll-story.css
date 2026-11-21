@@ -1,0 +1,152 @@
+.story-stage { position: relative; }
+.story-stage > .motion-control { position: absolute; top: 14px; bottom: auto; z-index: 4; }
+.deck-scroll-turn { position: absolute; inset: 0; display: block; transform-style: preserve-3d; border-radius: inherit; }
+.scroll-progress { display: none; }
+.scroll-story {
+  --landscape-exit: 0;
+  --note-entry: 0;
+  --card-turn: 0;
+  --story-progress: 0;
+  height: 380svh;
+  background: #1c142f;
+}
+.scroll-story .story-stage {
+  position: sticky; top: 0; height: 100svh; overflow: clip; isolation: isolate;
+  background: radial-gradient(ellipse at 50% 43%, #69406b, #271a3b 55%, #161225);
+}
+.scroll-story .feature {
+  position: absolute; inset: 0; height: 100%; min-height: 0;
+  opacity: calc(1 - var(--landscape-exit));
+  transform: translate3d(0, calc(var(--landscape-exit) * -13%), 0) scale(calc(1 + var(--landscape-exit) * .14));
+  transform-origin: 40% 46%;
+  will-change: transform, opacity;
+}
+.scroll-story .feature-layout { height: 100%; min-height: 0; }
+.scroll-story .feature-copy {
+  transform: translate3d(0, calc(var(--landscape-exit) * -100px), 0);
+}
+.scroll-story .scene-reeds {
+  translate: 0 calc(var(--landscape-exit) * 130px);
+}
+.scroll-story .feature[inert], .scroll-story .deck-chapter[inert], .scroll-story .field-note[inert] { pointer-events: none; }
+.scroll-story .trip-deck {
+  position: absolute; inset: 0; height: 100%; overflow: visible;
+  background: transparent; opacity: var(--landscape-exit);
+  transform: translate3d(0, calc((1 - var(--landscape-exit)) * 22%), 0);
+  will-change: opacity, transform;
+}
+.scroll-story .deck-shell { height: 100%; padding-block: 0; position: relative; }
+.scroll-story .deck-chapter {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  justify-content: center; padding-block: 55px 35px;
+  opacity: calc(1 - var(--note-entry));
+  transform: translate3d(0, calc(var(--note-entry) * -80px), 0) scale(calc(1 - var(--note-entry) * .08));
+  will-change: opacity, transform;
+}
+.scroll-story .deck-cards {
+  margin: clamp(18px,4vh,48px) 0 0; animation: none;
+  transform: none; flex: 0 1 auto;
+}
+.scroll-story .deck-card { width: min(21vw, 250px, 29svh); }
+.scroll-story .deck-card:nth-child(1) {
+  transform: translate3d(calc((1 - var(--landscape-exit)) * -90px), 0, 0) rotateZ(calc((1 - var(--landscape-exit)) * -16deg)) rotateY(-14deg) scale(.9);
+}
+.scroll-story .deck-card:nth-child(3) {
+  transform: translate3d(calc((1 - var(--landscape-exit)) * 90px), 0, 0) rotateZ(calc((1 - var(--landscape-exit)) * 16deg)) rotateY(14deg) scale(.9);
+}
+.scroll-story .deck-card[data-active=true] { filter: saturate(1) brightness(1); }
+.scroll-story .deck-scroll-turn {
+  transform: rotateY(calc(var(--card-turn) * 360deg));
+  will-change: transform;
+}
+.scroll-story .deck-card:nth-child(1) .deck-scroll-turn { transform: rotateY(calc(var(--card-turn) * 290deg)); }
+.scroll-story .deck-card:nth-child(3) .deck-scroll-turn { transform: rotateY(calc(var(--card-turn) * 420deg)); }
+.scroll-story .field-note {
+  position: absolute; inset: 0; margin: auto; height: min(63svh,570px); min-height: 0;
+  opacity: var(--note-entry); border: 0; overflow: visible;
+  background: transparent; animation: none;
+  transform: translate3d(0, calc((1 - var(--note-entry)) * 130px), 0);
+  will-change: transform, opacity;
+}
+.scroll-story .field-note-visual {
+  height: 100%; overflow: hidden; border: 1px solid #dca9df75; border-radius: 20px;
+  transform: perspective(900px) rotateY(calc((1 - var(--note-entry)) * -40deg)) scale(calc(.8 + var(--note-entry) * .2));
+  box-shadow: 0 15px 75px #e3a77822;
+}
+.scroll-story .field-note-visual::after { background: linear-gradient(0deg, #23172e70, transparent 55%); }
+.scroll-story .field-note-info { padding-right: 0; }
+.scroll-story .motion-control { position: absolute; top: auto; bottom: 20px; right: 23px; }
+.scroll-story .scroll-progress {
+  display: block; position: absolute; bottom: 0; left: 0; height: 3px; width: 100%;
+  background: #f5dbf519; pointer-events: none;
+}
+.scroll-progress span {
+  display: block; height: 100%; transform: scaleX(var(--story-progress)); transform-origin: left; background: #f6b8da;
+}
+.motion-story.motion-off .story-stage > .motion-control { position: fixed; bottom: 17px; top: auto; }
+@supports (animation-timeline: view()) {
+  .trip-card, .destination-detail, .utility-page .tray-item {
+    animation: section-arrive linear both;
+    animation-timeline: view(); animation-range: entry 0% entry 30%;
+  }
+  @keyframes section-arrive { from { opacity: .3; translate: 0 28px; } to { opacity: 1; translate: 0 0; } }
+  .destination-cover {
+    animation: destination-drift linear both;
+    animation-timeline: view(); animation-range: exit 0% exit 100%;
+  }
+  @keyframes destination-drift { to { translate: 0 16%; scale: 1.08; } }
+}
+@media (max-width: 620px) {
+  .scroll-story { height: 340svh; }
+  .scroll-story .feature-layout { padding-block: 92px 66px; align-content: center; }
+  .scroll-story .feature-pager { max-width: 320px; justify-self: start; }
+  .scroll-story .deck-chapter { padding-block: 30px 45px; }
+  .scroll-story .deck-heading h2 { font-size: clamp(29px,8vw,45px); }
+  .scroll-story .deck-cards { margin-top: 22px; }
+  .scroll-story .deck-card { width: min(64vw,34svh); }
+  .scroll-story .deck-card[data-active=false] { display: none; }
+  .scroll-story .field-note { height: min(82svh,690px); gap: 12px; grid-template-rows: minmax(0,1fr) auto; }
+  .scroll-story .field-note-visual { min-height: 0; width: min(52vw,220px); justify-self: center; }
+  .scroll-story .field-note-info { padding: 0 0 31px; }
+  .scroll-story .field-note-info h3 { font-size: 34px; }
+  .scroll-story .field-note-info > p:not(.section-kicker) { line-height: 1.4; font-size: 14px; }
+  .scroll-story .field-note-info .section-kicker { font-size: 11px; }
+  .scroll-story .field-note-meta { font-size: 13px; }
+}
+@media (max-height: 600px) and (min-width: 621px) {
+  .scroll-story .feature h1 { font-size: min(12vh,75px); }
+  .scroll-story .feature-copy > p:not(.section-kicker) { margin-block: 10px; }
+  .scroll-story .feature-layout { padding-block: 60px 30px; }
+  .scroll-story .deck-heading h2 { font-size: 38px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .trip-card, .destination-detail, .utility-page .tray-item, .destination-cover { animation: none; }
+}
+
+body { background: #1b172c; color: #fff0f8; }
+.site-header:not(.site-header--story) { background: #211a33f5; color: #fff0f8; border-color: #b995c240; }
+.site-header:not(.site-header--story) .brand-mark { background: #382344; color: #ffd1e2; }
+.site-header:not(.site-header--story) .trip-nav { border-color: #bf9dc875; }
+.site-header:not(.site-header--story) .trip-nav:hover { background: #503451; }
+.explore-heading p, .site-footer, .site-footer span:first-child { color: #e9cfe2; }
+.explore .filters button { border-color: #a784b38c; color: #f6e2ed; }
+.explore .filters button:hover { background: #523551; }
+.explore .filters button[aria-pressed=true] { background: #f9dceb; color: #30203b; border-color: #f9dceb; }
+.explore .search, .explore .date-filter { background: #2e233f; border-color: #a686b570; color: #f0d4e8; }
+.explore .search input, .explore .date-filter select { color: #f6eaf1; }
+.explore .search input::placeholder { color: #c8b4cc; }
+.explore .date-filter option { background: #2e233f; }
+.empty { color: #f0d8e6; border-color: #ab87b65e; }
+.site-footer { border-color: #d8b7e53d; }
+.destination-detail .destination-copy > p,
+.destination-detail .timeline, .destination-detail .included-list,
+.destination-detail .detail-meta span { color: #ead5e3; }
+.destination-detail .timeline li::marker { color: #efb3d0; }
+.destination-detail .reservation-card { background: #30233e; color: #fff0f7; border-color: #bc8bca61; }
+.destination-detail .reservation-price span { color: #ead5e3; }
+.utility-page .tray-item { border-color: #ae87bc52; }
+.utility-page .tray-item p { color: #ead5e3; }
+.utility-page .cancel { color: #ffd0db; }
+.utility-page .booking-status { color: #452b4f; }
+.utility-page .operator-section, .utility-page .operator-records li { border-color: #b48ac249; }
+.dialog { color: #291d35; }

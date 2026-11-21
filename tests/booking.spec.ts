@@ -129,3 +129,27 @@ test('fits a narrow screen and respects reduced motion', async ({ page }) => {
   await page.getByRole('button', { name: 'Reveal Lodhi before the crowds' }).click()
   await expect(page.getByRole('button', { name: 'Reveal Lodhi before the crowds' })).toHaveAttribute('aria-pressed', 'true')
 })
+
+test('scrolls smoothly from landscape to rotating cards to itinerary and back', async ({ page }) => {
+  await page.goto('/')
+  const story = page.locator('.scroll-story')
+  await expect(story).toHaveCount(1)
+  async function scrollToProgress(progress: number) {
+    await story.evaluate((element, fraction) => {
+      document.documentElement.style.scrollBehavior = 'auto'
+      window.scrollTo(0, window.scrollY + element.getBoundingClientRect().top + (element.clientHeight - innerHeight) * fraction)
+    }, progress)
+  }
+  await scrollToProgress(.43)
+  await expect.poll(() => story.evaluate(element => Number(getComputedStyle(element).getPropertyValue('--landscape-exit')))).toBe(1)
+  await expect(page.getByRole('button', { name: 'Next trip card' })).toBeInViewport()
+  const middleTurn = await page.locator('.deck-scroll-turn').first().evaluate(element => getComputedStyle(element).transform)
+  await scrollToProgress(.6)
+  await expect.poll(() => page.locator('.deck-scroll-turn').first().evaluate(element => getComputedStyle(element).transform)).not.toBe(middleTurn)
+  await scrollToProgress(.94)
+  await expect.poll(() => story.evaluate(element => Number(getComputedStyle(element).getPropertyValue('--note-entry')))).toBe(1)
+  await expect(page.getByRole('button', { name: 'View itinerary' })).toBeInViewport()
+  await scrollToProgress(.02)
+  await expect(page.getByRole('heading', { name: 'Delhi, rediscovered.' })).toBeInViewport()
+  await expect(page.locator('.deck-chapter')).toHaveAttribute('inert', '')
+})

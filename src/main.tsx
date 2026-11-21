@@ -6,5 +6,6 @@ import '@fontsource-variable/fraunces/wght-italic.css'
 import './styles.css'
 import './journeys.css'
 import './motion.css'
+import './scroll-story.css'
 
 createRoot(document.getElementById('root')!).render(<App />)

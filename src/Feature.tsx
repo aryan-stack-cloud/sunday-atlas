@@ -1,7 +1,8 @@
-import { useState, type PointerEvent } from 'react'
+import { useRef, useState, type PointerEvent } from 'react'
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUpRight, Clock3, MapPin, Pause, Play } from 'lucide-react'
 import { money, trips, type Trip } from './trips'
 
+import { useScrollStory } from './useScrollStory'
 import { Lights, TripDeck } from './TripDeck'
 
 const covers = [import.meta.env.BASE_URL + 'images/delhi-twilight.webp', trips[1].image, trips[2].image]
@@ -10,6 +11,18 @@ export function Feature({ onExplore, onOpen }: { onExplore: () => void; onOpen: 
   const [current, setCurrent] = useState(0)
   const trip = trips[current]
   const [paused, setPaused] = useState(false)
+  const story = useRef<HTMLDivElement>(null)
+  useScrollStory(story, paused)
+
+  function showCards() {
+    const element = story.current
+    if (element?.classList.contains('scroll-story')) {
+      const top = window.scrollY + element.getBoundingClientRect().top
+      window.scrollTo({ top: top + (element.offsetHeight - innerHeight) * .44, behavior: 'smooth' })
+    } else {
+      document.getElementById('trip-deck')?.scrollIntoView()
+    }
+  }
 
   function step(direction: number) {
     setCurrent(index => (index + direction + trips.length) % trips.length)
@@ -26,7 +39,8 @@ export function Feature({ onExplore, onOpen }: { onExplore: () => void; onOpen: 
   }
 
   return (
-    <div className={'motion-story' + (paused ? ' motion-off' : '')}>
+    <div ref={story} className={'motion-story' + (paused ? ' motion-off' : '')}>
+      <div className="story-stage">
       <section className={'feature feature--' + current} aria-labelledby="hero-title" onPointerMove={moveScene}
         onPointerLeave={event => {
           event.currentTarget.style.removeProperty('--scene-x')
@@ -44,7 +58,7 @@ export function Feature({ onExplore, onOpen }: { onExplore: () => void; onOpen: 
             <h1 id="hero-title">Delhi,<br /><em>rediscovered.</em></h1>
             <p>Find small-group walks, workshops and nature escapes around Delhi NCR.</p>
             <a href="#/experiences" className="feature-cta" onClick={onExplore}>Explore trips <ArrowUpRight size={17} /></a>
-            <button type="button" className="chapter-link" onClick={() => document.getElementById('trip-deck')?.scrollIntoView()}>
+            <button type="button" className="chapter-link" onClick={showCards}>
               Trip cards <ArrowDown size={16} />
             </button>
           </div>
@@ -72,10 +86,13 @@ export function Feature({ onExplore, onOpen }: { onExplore: () => void; onOpen: 
             </div>
           </div>
         </div>
-        <button type="button" className="motion-control" aria-label={paused ? 'Resume scene motion' : 'Pause scene motion'} aria-pressed={paused}
-          onClick={() => setPaused(value => !value)}>{paused ? <Play size={15} /> : <Pause size={15} />}</button>
+
       </section>
       <TripDeck onOpen={onOpen} />
+        <button type="button" className="motion-control" aria-label={paused ? 'Resume scene motion' : 'Pause scene motion'} aria-pressed={paused}
+          onClick={() => setPaused(value => !value)}>{paused ? <Play size={15} /> : <Pause size={15} />}</button>
+        <div className="scroll-progress" aria-hidden="true"><span /></div>
+      </div>
     </div>
   )
 }
